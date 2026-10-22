@@ -107,7 +107,7 @@ export function sortEvents(summaries, sortBy) {
   return mergeSort(summaries, compare);
 }
 
-export function searchEvents(summaries, criteria = {}, sortBy) {
+export function searchEvents(summaries, criteria = {}, sortBy = 'date') {
   const filtered = filterEvents(summaries, criteria);
-  return sortBy === undefined ? filtered : sortEvents(filtered, sortBy);
+  return sortEvents(filtered, sortBy);
 }

@@ -156,6 +156,7 @@ test('S05: search filters before sorting and rejects bad criteria', () => {
     { id: 'b', title: 'B', date: '2026-12-04', tiers: [{ priceCents: 200 }], availableSeats: 1 }
   ];
   assert.deepEqual(searchEvents(summaries, { maxPriceCents: 150 }, 'date').map((event) => event.id), ['a']);
+  assert.deepEqual(searchEvents(summaries, {}).map((event) => event.id), ['b', 'a']);
   errorCode(() => filterEvents(summaries, { from: 'not-a-date' }), 'VALIDATION');
   errorCode(() => filterEvents(summaries, { from: '2026-02-30T17:00:00Z' }), 'VALIDATION');
   errorCode(() => filterEvents(summaries, { maxPriceCents: 1.2 }), 'VALIDATION');
