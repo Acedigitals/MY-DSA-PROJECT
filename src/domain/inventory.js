@@ -2,7 +2,7 @@ import { DomainError } from './errors.js';
 import { newId, newReference } from './ids.js';
 import { Queue } from './waitlistQueue.js';
 
-const bookingStatuses = new Set(['CONFIRMED', 'CANCELLED']);
+const bookingStatuses = new Set(['PENDING', 'CONFIRMED', 'CANCELLED']);
 
 function requireObject(value, label) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
@@ -29,6 +29,23 @@ function requireCents(value, label) {
     throw new DomainError('VALIDATION', `${label} must be whole cents`);
   }
   return value;
+}
+
+function requireIsoDate(value, label) {
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new DomainError('VALIDATION', `${label} must be an ISO date string`);
+  }
+  const date = value.trim();
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(date);
+  if ((!dateOnly && !date.includes('T')) || Number.isNaN(Date.parse(date))) {
+    throw new DomainError('VALIDATION', `${label} must be a valid ISO date`);
+  }
+  const [year, month, day] = date.slice(0, 10).split('-').map(Number);
+  const checked = new Date(Date.UTC(year, month - 1, day));
+  if (checked.getUTCFullYear() !== year || checked.getUTCMonth() !== month - 1 || checked.getUTCDate() !== day) {
+    throw new DomainError('VALIDATION', `${label} must be a valid ISO date`);
+  }
+  return date;
 }
 
 function requireStore(store) {
@@ -72,11 +89,25 @@ export function createStore() {
 export function createEvent(store, details) {
   requireStore(store);
   requireObject(details, 'event details');
-  const name = requireNonEmptyString(details.name, 'event name');
+  const isBuildTwoEvent = details.title !== undefined || details.city !== undefined || details.venue !== undefined;
+  const title = requireNonEmptyString(details.title ?? details.name, 'event title');
+  const city = details.city === undefined
+    ? (isBuildTwoEvent ? requireNonEmptyString(details.city, 'event city') : null)
+    : requireNonEmptyString(details.city, 'event city');
+  const venue = details.venue === undefined
+    ? (isBuildTwoEvent ? requireNonEmptyString(details.venue, 'event venue') : null)
+    : requireNonEmptyString(details.venue, 'event venue');
+  const date = details.date === undefined
+    ? (isBuildTwoEvent ? requireIsoDate(details.date, 'event date') : null)
+    : requireIsoDate(details.date, 'event date');
   const event = {
     id: newId(),
-    name,
-    date: details.date === undefined ? null : requireNonEmptyString(details.date, 'event date'),
+    name: title,
+    title,
+    city,
+    venue,
+    date,
+    status: 'DRAFT',
     tiers: new Map()
   };
   store.events.set(event.id, event);
@@ -96,6 +127,7 @@ export function addTier(store, eventOrId, details) {
     name,
     capacity,
     available: capacity,
+    sold: 0,
     priceCents,
     waitlist: new Queue()
   };
@@ -118,6 +150,7 @@ export function bookTickets(store, details) {
   }
 
   tier.available -= quantity;
+  tier.sold += quantity;
   const booking = {
     id: newId(),
     reference: newReference(),
@@ -126,7 +159,7 @@ export function bookTickets(store, details) {
     customerName,
     quantity,
     totalCents: tier.priceCents * quantity,
-    status: 'CONFIRMED',
+    status: 'PENDING',
     createdAt: new Date().toISOString()
   };
   store.bookings.set(booking.reference, booking);
@@ -150,6 +183,7 @@ export function cancelBooking(store, reference) {
   const event = getEvent(store, booking.eventId);
   const tier = getTier(event, booking.tierId);
   tier.available += booking.quantity;
+  tier.sold -= booking.quantity;
   booking.status = 'CANCELLED';
   booking.cancelledAt = new Date().toISOString();
   return booking;
@@ -182,4 +216,51 @@ export function joinWaitlist(store, details) {
   };
   tier.waitlist.enqueue(entry);
   return entry;
+}
+
+export function publishEvent(store, eventId) {
+  requireStore(store);
+  const event = getEvent(store, eventId);
+  if (event.tiers.size === 0) {
+    throw new DomainError('INVALID_STATE', 'An event must have at least one ticket tier before publishing');
+  }
+  event.status = 'PUBLISHED';
+  return event;
+}
+
+export function listEventSummaries(store, options = {}) {
+  requireStore(store);
+  requireObject(options, 'options');
+  const { publishedOnly = true } = options;
+  if (typeof publishedOnly !== 'boolean') {
+    throw new DomainError('VALIDATION', 'publishedOnly must be a boolean');
+  }
+
+  const summaries = [];
+  for (const event of store.events.values()) {
+    if (publishedOnly && event.status !== 'PUBLISHED') {
+      continue;
+    }
+    const tiers = [...event.tiers.values()].map((tier) => ({
+      id: tier.id,
+      name: tier.name,
+      priceCents: tier.priceCents,
+      capacity: tier.capacity,
+      sold: tier.sold,
+      available: tier.available
+    }));
+    summaries.push({
+      id: event.id,
+      title: event.title,
+      name: event.name,
+      city: event.city,
+      venue: event.venue,
+      date: event.date,
+      status: event.status,
+      tiers,
+      cheapestPriceCents: tiers.length === 0 ? null : Math.min(...tiers.map((tier) => tier.priceCents)),
+      availableSeats: tiers.reduce((total, tier) => total + tier.available, 0)
+    });
+  }
+  return summaries;
 }
