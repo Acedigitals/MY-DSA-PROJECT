@@ -91,3 +91,33 @@
 
 - **What I changed:**
   I added strict calendar-date validation to `src/domain/inventory.js` and `src/domain/eventSearch.js`, including date-times. Invalid dates such as `2026-02-30T17:00:00Z` now throw a `DomainError` with code `VALIDATION`. I added regression tests for the invalid date-time case, reran the complete suite, and confirmed that all 17 tests pass. I also confirmed that `npm run demo`, `npm run benchmark`, and `git diff --check` pass.
+
+  ## Build 3: Architecture, state machine and server skeleton
+
+  ### Prompt 1: Build 3 implementation
+
+  - **What I asked:**
+    I asked the AI to read the project requirements and existing domain code, then add the layered architecture diagrams, booking state machine, HTTP router, static-file server, configuration, start script and Build 3 tests without changing the working Build 1/2 behavior.
+
+  - **What came back:**
+    The AI added the architecture documentation, explicit booking transitions, a parameter-aware router, a `node:http` application with `/health`, JSON error responses and safe static-file serving, a configurable server entry point, a public index file, and tests for the state machine, router and real HTTP requests.
+
+  - **What was wrong:**
+    Nothing remained wrong after review. The only implementation choice worth recording is that the Build 3 skeleton does not add business endpoints; it provides the requested health endpoint and infrastructure for later API builds.
+
+  - **What I changed:**
+    I ran the complete test suite, which passed all 22 tests, including the existing Build 1/2 tests. I also started the server on a temporary port and verified that `GET /health` returned HTTP 200 with `{"status":"ok"}`. The malformed JSON and unknown API tests confirmed that responses contain structured errors without stack traces.
+
+  ### Prompt 2: Cross-build alignment review
+
+  - **What I asked:**
+    I asked the AI to check the complete repository against the Build 1, Build 2 and Build 3 requirements and run the relevant regression and server checks.
+
+  - **What came back:**
+    The tests, demo, benchmark, live health endpoint, static file serving, API 404 handling and traversal protection all worked.
+
+  - **What was wrong:**
+    Two small Build 3 alignment issues were identified during review: `canTransition` treated unknown states as validation errors instead of returning `false`, and requesting `/` did not serve the public index file.
+
+  - **What I changed:**
+    I changed `canTransition` to return `false` for unknown or unsupported transitions, while `assertTransition` consistently throws `INVALID_TRANSITION`. I also mapped `/` to `public/index.html` and added a regression assertion. The complete suite still passes all 22 tests.
