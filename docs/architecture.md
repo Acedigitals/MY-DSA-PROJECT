@@ -1,9 +1,8 @@
 # Event Ticketing architecture
 
-This document describes the project as it exists at the end of Build 3. The
+This document describes the project as it exists at the end of Build 4. The
 application is a plain JavaScript ES-module project for Node.js 22.13 or
-newer. It currently uses an in-memory store and has a server skeleton; the
-business API routes will be added in later builds.
+newer. It uses an in-memory repository and a working REST API.
 
 ## Project structure
 
@@ -11,6 +10,13 @@ business API routes will be added in later builds.
 src/
 ├── config.js                         PORT configuration
 ├── server.js                         Node HTTP server entry point
+├── repositories/
+│   └── memory.js                     async in-memory repository
+├── services/
+│   ├── eventService.js               event rules and search use cases
+│   └── bookingService.js             booking and payment use cases
+├── lib/
+│   └── mockPaymentGateway.js         mock payment adapter
 ├── domain/
 │   ├── errors.js                     DomainError and error codes
 │   ├── ids.js                        secure IDs and booking references
@@ -37,10 +43,10 @@ flowchart TD
   Router --> Health[GET /health]
   App --> Static[public/index.html and other public files]
   App --> Errors[JSON error responses]
-  App -. future API routes .-> Routes[Application routes]
-  Routes -. future use cases .-> Services[Application services]
-  Services -. future domain calls .-> Rules[src/domain rules]
-  Services -. future persistence .-> Repository[Repository layer]
+  App --> Routes[API routes]
+  Routes --> Services[Application services]
+  Services --> Rules[src/domain rules]
+  Services --> Repository[Async memory repository]
   Rules --> Inventory[src/domain/inventory.js]
   Rules --> Search[src/domain/eventSearch.js]
   Rules --> StateMachine[src/domain/bookingStateMachine.js]
@@ -52,15 +58,14 @@ flowchart TD
 - **HTTP application and routes (`src/http/app.js` and `router.js`)** parse
   requests, match methods and `:params`, serve `public/`, and format responses;
   they may not decide ticket, booking, or payment policy.
-- **Application services** are planned for a later build; they will coordinate
-  use cases without knowing HTTP details.
+- **Application services (`src/services/`)** coordinate API use cases and call
+  domain rules and repositories; they do not know HTTP details.
 - **Domain rules (`src/domain/`)** validate input and enforce inventory,
   searching, sorting, queue, error, and booking-state rules; they must not
   depend on HTTP.
-- **Repositories/data** are currently represented by `createStore()` in
-  `src/domain/inventory.js`, using `Map` for events and bookings and a linked
-  queue for tier waitlists. A persistent repository is planned for a later
-  build.
+- **Repository/data (`src/repositories/memory.js`)** provides async event,
+  tier, and booking operations over in-memory `Map` objects. It does not own
+  business policy.
 
 ## Data model
 
@@ -127,6 +132,8 @@ erDiagram
 - Each tier has a linked-list `Queue` for FIFO waitlist entries.
 - There is not yet a user or authentication model; `customerName` is the
   current booking identity. Users are planned for a later build.
+- Build 4 identifies callers with the `x-user-id` request header; it does not
+  yet implement accounts or authentication.
 
 ## Booking life cycle
 
@@ -154,12 +161,19 @@ values `PENDING`, `CONFIRMED`, and `CANCELLED`; the state machine provides the
 lowercase lifecycle contract that later payment, refund, expiry, and
 check-in services will adopt.
 
-## HTTP behavior delivered in Build 3
+## HTTP behavior delivered in Build 4
 
 | Request | Current result |
 |---|---|
 | `GET /` | Serves `public/index.html` |
 | `GET /health` | Returns `{"status":"ok"}` |
+| `POST /api/events` | Creates a draft event |
+| `POST /api/events/:id/tiers` | Adds a ticket tier |
+| `POST /api/events/:id/publish` | Publishes an event |
+| `GET /api/events` | Searches published events |
+| `POST /api/bookings` | Creates a pending booking |
+| `POST /api/bookings/:reference/pay` | Pays with the mock gateway |
+| `POST /api/bookings/:reference/cancel` | Cancels an unpaid booking |
 | Unknown `/api/...` path | JSON `404` with `{ "error": { "code", "message" } }` |
 | Invalid JSON request body | JSON `400` with the same error shape |
 | Missing public file | JSON `404` |

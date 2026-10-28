@@ -3,6 +3,11 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRouter } from './router.js';
+import { createMemoryRepository } from '../repositories/memory.js';
+import { createEventService } from '../services/eventService.js';
+import { createBookingService } from '../services/bookingService.js';
+import { createMockPaymentGateway } from '../lib/mockPaymentGateway.js';
+import { DomainError } from '../domain/errors.js';
 
 const defaultPublicDir = path.resolve(fileURLToPath(new URL('../../public', import.meta.url)));
 
@@ -26,6 +31,59 @@ function sendJson(response, statusCode, body) {
 
 function sendError(response, statusCode, code, message) {
   sendJson(response, statusCode, { error: { code, message } });
+}
+
+function statusForError(error) {
+  if (error?.code === 'NOT_FOUND') return 404;
+  if (error?.code === 'FORBIDDEN') return 403;
+  if (error?.code === 'SOLD_OUT' || error?.code === 'INVALID_STATE'
+    || error?.code === 'INVALID_TRANSITION' || error?.code === 'PAYMENT_DECLINED') return 409;
+  if (error?.code === 'ALREADY_CANCELLED') return 409;
+  if (error?.code === 'VALIDATION') return 400;
+  return 500;
+}
+
+function userId(request) {
+  const value = request.headers['x-user-id'];
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new Error('x-user-id header is required');
+  }
+  return value.trim();
+}
+
+function registerApiRoutes(router, eventService, bookingService) {
+  router.post('/api/events', async (request, context) => eventService.create(context.body));
+  router.post('/api/events/:id/tiers', async (request, context) => eventService.addTier(context.params.id, context.body));
+  router.post('/api/events/:id/publish', async (request, context) => eventService.publish(context.params.id));
+  router.get('/api/events', async (request, context) => {
+    const query = new URL(request.url ?? '/', 'http://localhost').searchParams;
+    const criteria = {};
+    for (const key of ['q', 'city', 'from', 'to']) {
+      if (query.has(key)) criteria[key] = query.get(key);
+    }
+    if (query.has('maxPriceCents')) criteria.maxPriceCents = Number(query.get('maxPriceCents'));
+    if (query.has('onlyAvailable')) {
+      const value = query.get('onlyAvailable');
+      if (value !== 'true' && value !== 'false') {
+        throw new DomainError('VALIDATION', 'onlyAvailable must be true or false');
+      }
+      criteria.onlyAvailable = value === 'true';
+    }
+    return eventService.search(criteria, query.get('sortBy') ?? 'date');
+  });
+  router.post('/api/bookings', async (request, context) => bookingService.book({
+    ...context.body,
+    userId: userId(request)
+  }));
+  router.post('/api/bookings/:reference/pay', async (request, context) => bookingService.pay(
+    context.params.reference,
+    userId(request),
+    context.body ?? {}
+  ));
+  router.post('/api/bookings/:reference/cancel', async (request, context) => bookingService.cancel(
+    context.params.reference,
+    userId(request)
+  ));
 }
 
 function readJson(request) {
@@ -88,7 +146,16 @@ async function serveStatic(response, publicDir, pathname) {
   }
 }
 
-export function createApp({ router = createRouter(), publicDir = defaultPublicDir } = {}) {
+export function createApp({
+  router = createRouter(),
+  publicDir = defaultPublicDir,
+  eventService,
+  bookingService
+} = {}) {
+  const repository = eventService && bookingService ? null : createMemoryRepository();
+  const events = eventService ?? createEventService(repository);
+  const bookings = bookingService ?? createBookingService(repository, createMockPaymentGateway());
+  registerApiRoutes(router, events, bookings);
   router.get('/health', (_request, _context) => ({ status: 'ok' }));
 
   return async function app(request, response) {
@@ -121,7 +188,8 @@ export function createApp({ router = createRouter(), publicDir = defaultPublicDi
       await serveStatic(response, publicDir, url.pathname);
     } catch (error) {
       if (!response.writableEnded) {
-        sendError(response, 500, 'INTERNAL_ERROR', 'Internal server error');
+        const code = error?.code ?? (error?.message === 'x-user-id header is required' ? 'VALIDATION' : 'INTERNAL_ERROR');
+        sendError(response, statusForError(error), code, statusForError(error) === 500 ? 'Internal server error' : error.message);
       }
     }
   };

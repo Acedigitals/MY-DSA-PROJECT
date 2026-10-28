@@ -121,3 +121,22 @@
 
   - **What I changed:**
     I changed `canTransition` to return `false` for unknown or unsupported transitions, while `assertTransition` consistently throws `INVALID_TRANSITION`. I also mapped `/` to `public/index.html` and added a regression assertion. The complete suite still passes all 22 tests.
+
+    ## Build 4: Working REST API in memory
+
+    ### Prompt 1: Build 4 implementation
+
+    - **What I asked:**
+      I asked the AI to read the Build 4 requirements, architecture, and existing source, then add an async in-memory repository, injected event and booking services, a mock payment gateway, REST routes, API examples, and real HTTP API tests without breaking Builds 1–3.
+
+    - **What came back:**
+      The project now has `src/repositories/memory.js`, event and booking services, a mock payment adapter, API routes for events, tiers, publishing, searching, booking, payment, and cancellation, Build 4 curl examples, and end-to-end tests that start a real server on a free port.
+
+    - **What was wrong:**
+      The first draft of the Build 4 test helper used asynchronous import syntax inside a non-async Promise callback. The first cancellation implementation also needed to enforce Build 4's unpaid-only rule rather than relying on the broader state machine transition list.
+
+    - **What I changed:**
+      I corrected the test helper to use a normal `node:http` import and changed paid bookings to be rejected when cancellation is requested. The API now keeps declined payments pending, checks booking ownership through `x-user-id`, and returns the shared JSON error shape.
+
+    - **Validation:**
+      `npm test` passes all 24 tests, including the existing Build 1–3 tests and the Build 4 real-server API tests.
