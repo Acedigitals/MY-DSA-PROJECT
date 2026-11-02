@@ -1,0 +1,910 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Event Ticketing API",
+    "version": "1.0.0",
+    "description": "HTTP API for creating events, managing ticket tiers, searching published events, and booking tickets."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Local development server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Health",
+      "description": "Service health"
+    },
+    {
+      "name": "Events",
+      "description": "Event and ticket-tier management"
+    },
+    {
+      "name": "Bookings",
+      "description": "Ticket booking and booking lifecycle operations"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Check service health",
+        "operationId": "getHealth",
+        "responses": {
+          "200": {
+            "description": "Service is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                },
+                "example": {
+                  "status": "ok"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/events": {
+      "post": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Create an event",
+        "operationId": "createEvent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEventRequest"
+              },
+              "example": {
+                "title": "Lagos Tech Meetup",
+                "city": "Lagos",
+                "venue": "Civic Hall",
+                "date": "2026-12-05T17:00:00Z"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Event created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Event"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Search published events",
+        "operationId": "searchEvents",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Query"
+          },
+          {
+            "name": "city",
+            "in": "query",
+            "description": "Exact city match, case-insensitive.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "Only events on or after this ISO date or date-time.",
+            "schema": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              ]
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Only events on or before this ISO date or date-time.",
+            "schema": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              ]
+            }
+          },
+          {
+            "name": "maxPriceCents",
+            "in": "query",
+            "description": "Maximum cheapest ticket price in whole cents.",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "format": "int64"
+            }
+          },
+          {
+            "name": "onlyAvailable",
+            "in": "query",
+            "description": "Return only events with available seats.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "sortBy",
+            "in": "query",
+            "description": "Sort order for the results.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "date",
+                "price",
+                "availability"
+              ],
+              "default": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Matching published events",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EventSummary"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          }
+        }
+      }
+    },
+    "/api/events/{id}/tiers": {
+      "post": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Add a ticket tier to an event",
+        "operationId": "createTicketTier",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/EventId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTierRequest"
+              },
+              "example": {
+                "name": "General",
+                "priceCents": 500000,
+                "capacity": 100
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ticket tier created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketTier"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          }
+        }
+      }
+    },
+    "/api/events/{id}": {
+      "get": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "View an event",
+        "operationId": "getEvent",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/EventId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Event details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventSummary"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          }
+        }
+      }
+    },
+    "/api/events/{id}/publish": {
+      "post": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Publish an event",
+        "operationId": "publishEvent",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/EventId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Event published",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Event"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "409": {
+            "$ref": "#/components/responses/ConflictError"
+          }
+        }
+      }
+    },
+    "/api/events/{id}/unpublish": {
+      "post": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Unpublish an event",
+        "operationId": "unpublishEvent",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/EventId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Event returned to draft status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Event"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          }
+        }
+      }
+    },
+    "/api/bookings": {
+      "post": {
+        "tags": [
+          "Bookings"
+        ],
+        "summary": "Book tickets",
+        "operationId": "createBooking",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UserId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBookingRequest"
+              },
+              "example": {
+                "eventId": "event-id",
+                "tierId": "tier-id",
+                "quantity": 2
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Booking created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Booking"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "409": {
+            "$ref": "#/components/responses/SoldOutError"
+          }
+        }
+      }
+    },
+    "/api/bookings/{reference}/pay": {
+      "post": {
+        "tags": [
+          "Bookings"
+        ],
+        "summary": "Pay for a booking",
+        "operationId": "payForBooking",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/BookingReference"
+          },
+          {
+            "$ref": "#/components/parameters/UserId"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayBookingRequest"
+              },
+              "example": {
+                "decline": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Booking paid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Booking"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PaymentOrTransitionError"
+          }
+        }
+      }
+    },
+    "/api/bookings/{reference}/cancel": {
+      "post": {
+        "tags": [
+          "Bookings"
+        ],
+        "summary": "Cancel an unpaid booking",
+        "operationId": "cancelBooking",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/BookingReference"
+          },
+          {
+            "$ref": "#/components/parameters/UserId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Booking cancelled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Booking"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "409": {
+            "$ref": "#/components/responses/ConflictError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "EventId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "Event identifier.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "BookingReference": {
+        "name": "reference",
+        "in": "path",
+        "required": true,
+        "description": "Booking reference.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "UserId": {
+        "name": "x-user-id",
+        "in": "header",
+        "required": true,
+        "description": "Identity of the booking owner.",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "Query": {
+        "name": "q",
+        "in": "query",
+        "description": "Case-insensitive text matched against event title and venue.",
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "schemas": {
+      "HealthResponse": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok"
+            ]
+          }
+        }
+      },
+      "CreateEventRequest": {
+        "type": "object",
+        "required": [
+          "title",
+          "city",
+          "venue",
+          "date"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "city": {
+            "type": "string",
+            "minLength": 1
+          },
+          "venue": {
+            "type": "string",
+            "minLength": 1
+          },
+          "date": {
+            "type": "string",
+            "description": "ISO date or ISO date-time.",
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "string",
+                "format": "date-time"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateTierRequest": {
+        "type": "object",
+        "required": [
+          "name",
+          "priceCents",
+          "capacity"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "priceCents": {
+            "type": "integer",
+            "minimum": 0,
+            "format": "int64"
+          },
+          "capacity": {
+            "type": "integer",
+            "minimum": 1,
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateBookingRequest": {
+        "type": "object",
+        "required": [
+          "eventId",
+          "tierId",
+          "quantity"
+        ],
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "tierId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          }
+        },
+        "additionalProperties": false
+      },
+      "PayBookingRequest": {
+        "type": "object",
+        "properties": {
+          "decline": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "TicketTier": {
+        "type": "object",
+        "required": [
+          "id",
+          "eventId",
+          "name",
+          "capacity",
+          "sold",
+          "available",
+          "priceCents"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "eventId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "capacity": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sold": {
+            "type": "integer",
+            "minimum": 0,
+            "format": "int64"
+          },
+          "available": {
+            "type": "integer",
+            "minimum": 0,
+            "format": "int64"
+          },
+          "priceCents": {
+            "type": "integer",
+            "minimum": 0,
+            "format": "int64"
+          }
+        }
+      },
+      "Event": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "city",
+          "venue",
+          "date",
+          "status",
+          "tiers"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "venue": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "description": "ISO date or ISO date-time.",
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "string",
+                "format": "date-time"
+              }
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "PUBLISHED"
+            ]
+          },
+          "tiers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TicketTier"
+            }
+          }
+        }
+      },
+      "EventSummary": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Event"
+          },
+          {
+            "type": "object",
+            "required": [
+              "cheapestPriceCents",
+              "availableSeats"
+            ],
+            "properties": {
+              "cheapestPriceCents": {
+                "type": "integer",
+                "nullable": true,
+                "minimum": 0,
+                "format": "int64"
+              },
+              "availableSeats": {
+                "type": "integer",
+                "minimum": 0,
+                "format": "int64"
+              }
+            }
+          }
+        ]
+      },
+      "Booking": {
+        "type": "object",
+        "required": [
+          "id",
+          "reference",
+          "eventId",
+          "tierId",
+          "userId",
+          "quantity",
+          "totalCents",
+          "status",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "eventId": {
+            "type": "string"
+          },
+          "tierId": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          },
+          "totalCents": {
+            "type": "integer",
+            "minimum": 0,
+            "format": "int64"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "PAID",
+              "CANCELLED"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "paidAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cancelledAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorDetail"
+          }
+        }
+      },
+      "ErrorDetail": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "responses": {
+      "ValidationError": {
+        "description": "The request was invalid.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": {
+                "code": "VALIDATION",
+                "message": "quantity must be between 1 and 10"
+              }
+            }
+          }
+        }
+      },
+      "NotFoundError": {
+        "description": "The requested resource was not found.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "ForbiddenError": {
+        "description": "The caller does not own the booking.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "ConflictError": {
+        "description": "The requested state transition is not allowed.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "SoldOutError": {
+        "description": "There are not enough available seats.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "PaymentOrTransitionError": {
+        "description": "Payment was declined or the booking cannot be paid.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    }
+  }
+}

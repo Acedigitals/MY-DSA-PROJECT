@@ -169,7 +169,9 @@ check-in services will adopt.
 | `GET /health` | Returns `{"status":"ok"}` |
 | `POST /api/events` | Creates a draft event |
 | `POST /api/events/:id/tiers` | Adds a ticket tier |
+| `GET /api/events/:id` | Views an event |
 | `POST /api/events/:id/publish` | Publishes an event |
+| `POST /api/events/:id/unpublish` | Returns an event to draft status |
 | `GET /api/events` | Searches published events |
 | `POST /api/bookings` | Creates a pending booking |
 | `POST /api/bookings/:reference/pay` | Pays with the mock gateway |
