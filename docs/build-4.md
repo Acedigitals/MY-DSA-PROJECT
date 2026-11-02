@@ -77,7 +77,9 @@ Build a working REST API that keeps its data in memory.
 
 4. Routes, with the same error shape as /health:
    - POST /api/events and POST /api/events/:id/tiers
+   - GET /api/events/:id (view event)
    - POST /api/events/:id/publish
+   - POST /api/events/:id/unpublish
    - GET /api/events (search, filter and sort through query parameters)
    - POST /api/bookings (book tickets from a tier)
    - POST /api/bookings/:reference/pay (success, or PAYMENT_DECLINED)

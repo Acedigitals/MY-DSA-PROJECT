@@ -98,6 +98,18 @@ export function createEventService(repository) {
       return repository.updateEvent(event.id, { status: 'PUBLISHED' });
     },
 
+    async get(eventId) {
+      const event = await repository.getEvent(requireText(eventId, 'eventId'));
+      if (!event) throw new DomainError('NOT_FOUND', `Event ${eventId} was not found`);
+      return summary(event);
+    },
+
+    async unpublish(eventId) {
+      const event = await repository.getEvent(requireText(eventId, 'eventId'));
+      if (!event) throw new DomainError('NOT_FOUND', `Event ${eventId} was not found`);
+      return repository.updateEvent(event.id, { status: 'DRAFT' });
+    },
+
     async search(criteria = {}, sortBy = 'date') {
       const events = (await repository.listEvents()).map(summary);
       const visible = events.filter((event) => event.status === 'PUBLISHED');

@@ -52,9 +52,15 @@ function userId(request) {
 }
 
 function registerApiRoutes(router, eventService, bookingService) {
+  router.get('/openapi.json', async () => {
+    const specificationPath = path.resolve(defaultPublicDir, '..', 'openapi.json');
+    return JSON.parse(await fs.readFile(specificationPath, 'utf8'));
+  });
   router.post('/api/events', async (request, context) => eventService.create(context.body));
   router.post('/api/events/:id/tiers', async (request, context) => eventService.addTier(context.params.id, context.body));
   router.post('/api/events/:id/publish', async (request, context) => eventService.publish(context.params.id));
+  router.post('/api/events/:id/unpublish', async (request, context) => eventService.unpublish(context.params.id));
+  router.get('/api/events/:id', async (request, context) => eventService.get(context.params.id));
   router.get('/api/events', async (request, context) => {
     const query = new URL(request.url ?? '/', 'http://localhost').searchParams;
     const criteria = {};
