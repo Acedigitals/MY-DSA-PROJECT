@@ -35,12 +35,7 @@ export function createBookingService(repository, paymentGateway) {
       if (!tier) throw new DomainError('NOT_FOUND', `Tier ${tierId} was not found`);
       const owner = requireText(userId, 'userId');
       const count = requireQuantity(quantity);
-      if (tier.available < count) throw new DomainError('SOLD_OUT', `Not enough seats in ${tier.name}`);
-
-      await repository.updateTier(event.id, tier.id, {
-        available: tier.available - count,
-        sold: tier.sold + count
-      });
+      await repository.reserveSeats(event.id, tier.id, count);
       return repository.createBooking({
         eventId: event.id,
         tierId: tier.id,

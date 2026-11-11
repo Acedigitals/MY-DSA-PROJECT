@@ -140,3 +140,79 @@
 
     - **Validation:**
       `npm test` passes all 24 tests, including the existing Build 1–3 tests and the Build 4 real-server API tests.
+
+## Build 5: SQLite and the overselling fix
+
+### Prompt 1 and Prompt 2: SQLite migration and atomic inventory reservation
+
+- **What I asked:**
+  I asked the AI to move persistence from the in-memory repository to SQLite
+  using `node:sqlite`, add relational constraints, seed data, reproduce the
+  last-ticket race, and fix it with an atomic database update.
+
+- **What came back:**
+  The project now has a SQLite schema and connection module, an async SQLite
+  repository with the same service-facing operations as the memory repository,
+  a persistent server database, a repeat-safe seed script, an oversell demo,
+  and a concurrency test.
+
+- **What was wrong:**
+  The initial SQLite repository update method constructed a dynamic SQL
+  assignment list. Although its values were parameterised, this was
+  unnecessary for the fixed booking fields and did not follow the prompt's
+  strongest interpretation of avoiding query construction.
+
+- **What I changed:**
+  I replaced that dynamic update with three fixed parameterised statements.
+  Seat reservation now uses one conditional `UPDATE` and checks its changed-row
+  count; a failed update raises `SOLD_OUT`. I also updated the architecture
+  documentation to describe SQLite persistence and the atomic reservation.
+
+- **Validation:**
+  `npm test` passes all 26 tests. `npm run oversell` reports 1 successful
+  booking, 49 `SOLD_OUT` responses, and 2 seats sold including the setup
+  booking. Syntax checks pass.
+
+## Cross-build audit: Builds 1 to 5
+
+- **What I checked:**
+  I compared the Build 1–5 requirements, user stories, acceptance criteria,
+  milestone notes, architecture, API examples, OpenAPI specification, source
+  files, scripts, database schema, repositories, and tests. I also reviewed the
+  Git status and milestone commit history.
+
+- **What I ran:**
+  - `npm test`
+  - `npm run demo`
+  - `npm run benchmark`
+  - `npm run oversell`
+  - `npm run seed`
+  - JavaScript syntax checks and `git diff --check`
+  - A live SQLite-backed server check for `/health`, `/`, `/docs.html`, and an
+    unknown API route
+  - A close-and-reopen database check for persistence
+
+- **What passed:**
+  The automated suite passed 26 tests with zero failures. The Build 1 demo
+  showed sell-out, rejection, FIFO waitlist behavior, and cancellation. The
+  lookup benchmark compared `Map.get()` with `Array.find()`. The Build 5
+  oversell demo reported one successful booking, 49 `SOLD_OUT` responses, and
+  two seats sold including the setup booking. The live server returned 200 for
+  `/health`, `/`, and `/docs.html`, and 404 for an unknown API route.
+  Closing and reopening SQLite preserved an inserted event.
+
+- **What is aligned:**
+  Builds 1–4 match their implemented requirements and have corresponding
+  domain, HTTP, API, and state-machine tests. Build 5 has SQLite persistence,
+  relational constraints, parameterized queries, an atomic conditional seat
+  reservation, a concurrency test, a demo, and a seed script.
+
+- **What remains unclear or unfinished:**
+  The Build 5 test suite does not yet automate server-restart persistence.
+  The booking service currently permits booking a `DRAFT` event because it
+  checks the event and tier but not the event status; this should be resolved
+  before claiming the published-event booking rule is complete. Build 1 queue
+  and waitlist functions are demonstrated but do not each have dedicated
+  automated tests. Authentication, refunds, expiry, persisted waitlists, QR
+  check-in, CI, and security features belong to later builds and were not
+  found in the current implementation.

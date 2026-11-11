@@ -155,12 +155,15 @@ async function serveStatic(response, publicDir, pathname) {
 export function createApp({
   router = createRouter(),
   publicDir = defaultPublicDir,
+  repository,
   eventService,
   bookingService
 } = {}) {
-  const repository = eventService && bookingService ? null : createMemoryRepository();
-  const events = eventService ?? createEventService(repository);
-  const bookings = bookingService ?? createBookingService(repository, createMockPaymentGateway());
+  const dataRepository = eventService && bookingService
+    ? null
+    : repository ?? createMemoryRepository();
+  const events = eventService ?? createEventService(dataRepository);
+  const bookings = bookingService ?? createBookingService(dataRepository, createMockPaymentGateway());
   registerApiRoutes(router, events, bookings);
   router.get('/health', (_request, _context) => ({ status: 'ok' }));
 

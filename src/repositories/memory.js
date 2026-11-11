@@ -1,5 +1,6 @@
 import { newId, newReference } from '../domain/ids.js';
 import { Queue } from '../domain/waitlistQueue.js';
+import { DomainError } from '../domain/errors.js';
 
 function cloneTier(tier) {
   return {
@@ -92,6 +93,17 @@ export function createMemoryRepository() {
       const tier = event?.tiers.get(tierId);
       if (!tier) return undefined;
       Object.assign(tier, changes);
+      return cloneTier(tier);
+    },
+
+    async reserveSeats(eventId, tierId, quantity) {
+      const event = events.get(eventId);
+      const tier = event?.tiers.get(tierId);
+      if (!tier || tier.available < quantity) {
+        throw new DomainError('SOLD_OUT', 'Not enough seats available');
+      }
+      tier.available -= quantity;
+      tier.sold += quantity;
       return cloneTier(tier);
     },
 
