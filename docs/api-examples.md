@@ -1,4 +1,4 @@
-Invoke-WebRequest http://localhost:3000/api/unknown# Build 4 API examples
+# Build 4 API examples
 
 Set the server URL and caller identity before running the examples:
 
