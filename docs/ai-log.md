@@ -216,3 +216,35 @@
   automated tests. Authentication, refunds, expiry, persisted waitlists, QR
   check-in, CI, and security features belong to later builds and were not
   found in the current implementation.
+
+  ## Build 6: Browser frontend on mock data
+
+  - **What I checked:**
+    I reviewed the Build 6 requirements, the new HTML pages, CSS, browser
+    modules, mock data, API adapter, and the existing static-file server.
+
+  - **What I ran:**
+    - `node --check` for every new browser JavaScript module
+    - `npm test`
+    - A local server check for `/`, `/event.html?id=event-lagos-tech`, and the
+      frontend module and stylesheet paths
+    - Browser checks for event rendering, city filtering, sold-out tiers,
+      booking, the checkout countdown, declined payment, retry, and successful
+      payment
+    - `git diff --check`
+
+  - **What passed:**
+    The browser lists three mock published events. City filtering reduced the
+    list to the Abuja event. Event details show available and sold-out tiers;
+    the sold-out VIP button is disabled. A booking opened checkout with a
+    ten-minute countdown. A declined mock payment displayed
+    `Payment was declined. You can try again.`, and retrying with the decline
+    option cleared completed payment and showed the booking confirmation.
+    Existing backend tests still pass all 26 tests.
+
+  - **What remains unclear or unfinished:**
+    Build 6 uses mock data only and does not call the real API. The countdown
+    stops at zero but does not automatically release seats from mock data.
+    The mock card field is required, but no card-number format validation was
+    found in code. No browser test framework or automated DOM test suite was
+    found in the repository.
