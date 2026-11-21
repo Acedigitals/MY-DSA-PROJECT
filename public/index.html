@@ -2,9 +2,50 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <title>Event Ticketing</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Browse and book tickets for upcoming events.">
+    <title>Events | Event Ticketing</title>
+    <link rel="stylesheet" href="/css/styles.css">
   </head>
   <body>
-    <h1>Event Ticketing</h1>
+    <header class="site-header">
+      <a class="brand" href="/">Event Ticketing</a>
+      <span class="build-label">Build 6 demo</span>
+    </header>
+    <main class="container">
+      <section class="hero">
+        <p class="eyebrow">Find your next experience</p>
+        <h1>Browse upcoming events</h1>
+        <p>Search published events, compare ticket tiers, and reserve your place.</p>
+      </section>
+
+      <form class="filters card" id="filters">
+        <div class="field">
+          <label for="query">Search</label>
+          <input id="query" name="query" type="search" placeholder="Event or venue">
+        </div>
+        <div class="field">
+          <label for="city">City</label>
+          <input id="city" name="city" type="text" placeholder="All cities">
+        </div>
+        <div class="field">
+          <label for="max-price">Maximum price (₦)</label>
+          <input id="max-price" name="maxPrice" type="number" min="0" step="1" placeholder="Any price">
+        </div>
+        <div class="field">
+          <label for="sort">Sort by</label>
+          <select id="sort" name="sort">
+            <option value="date">Date</option>
+            <option value="price">Price</option>
+            <option value="availability">Availability</option>
+          </select>
+        </div>
+        <button class="button button-secondary" type="submit">Apply filters</button>
+      </form>
+
+      <p class="status" id="results-status" role="status"></p>
+      <section class="event-grid" id="event-list" aria-live="polite"></section>
+    </main>
+    <script type="module" src="/js/pages/home.js"></script>
   </body>
 </html>
